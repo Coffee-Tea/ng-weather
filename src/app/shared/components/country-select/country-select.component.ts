@@ -8,9 +8,10 @@ import {
   ViewChild,
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
-import { CountryService } from 'app/country.service';
 import { combineLatest, fromEvent, Observable } from 'rxjs';
 import { debounceTime, filter, map, skip, startWith, switchMap, tap } from 'rxjs/operators';
+
+import { CountryService } from '../../../country.service';
 
 export type CountrySelectOption = {
   name: string;
