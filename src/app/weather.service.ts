@@ -1,7 +1,16 @@
+import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import {Observable} from 'rxjs';
+import { BehaviorSubject, Observable, timer } from 'rxjs';
+import { switchMap, tap } from 'rxjs/operators';
 
-import {HttpClient} from '@angular/common/http';
+export interface LocationAttributes {
+  countryCode: string;
+  zipcode: string;
+}
+
+export interface LocationConditions extends LocationAttributes {
+  data$: Observable<any>;
+}
 
 @Injectable()
 export class WeatherService {
@@ -9,24 +18,46 @@ export class WeatherService {
   static URL = 'http://api.openweathermap.org/data/2.5';
   static APPID = '5a4b2d457ecbef9eb2a71e480b947604';
   static ICON_URL = 'https://raw.githubusercontent.com/udacity/Sunshine-Version-2/sunshine_master/app/src/main/res/drawable-hdpi/';
-  private currentConditions = [];
+  private currentConditions: LocationConditions[] = [];
+  
+  private isAddingState: BehaviorSubject<boolean> = new BehaviorSubject(false);
+
+  get isAdding$(): Observable<boolean> {
+    return this.isAddingState.asObservable();
+  }
 
   constructor(private http: HttpClient) { }
 
-  addCurrentConditions(zipcode: string): void {
-    // Here we make a request to get the curretn conditions data from the API. Note the use of backticks and an expression to insert the zipcode
-    this.http.get(`${WeatherService.URL}/weather?zip=${zipcode},us&units=imperial&APPID=${WeatherService.APPID}`)
-      .subscribe(data => this.currentConditions.push({zip: zipcode, data: data}) );
+  addCurrentConditions({ countryCode, zipcode }: LocationAttributes, isNew: boolean, refreshInterval: number = 30000): void {
+    if (isNew) {
+      this.isAddingState.next(true);
+    }
+
+    // Here we make a request to get the current conditions data from the API. Note the use of backticks and an expression to insert the zipcode
+    this.currentConditions.push({
+      countryCode,
+      zipcode,
+      data$: timer(0, refreshInterval).pipe(
+        switchMap(() => this.http.get(
+          `${WeatherService.URL}/weather?zip=${zipcode},${countryCode}&units=imperial&APPID=${WeatherService.APPID}`,
+        )),
+        tap(() => {
+          if (isNew && this.isAddingState.value) {
+            this.isAddingState.next(false);
+          }
+        })
+      )
+    });
   }
 
-  removeCurrentConditions(zipcode: string) {
+  removeCurrentConditions({ countryCode, zipcode }: LocationAttributes) {
     for (let i in this.currentConditions){
-      if (this.currentConditions[i].zip == zipcode)
+      if (this.currentConditions[i].zipcode === zipcode && this.currentConditions[i].zipcode === countryCode)
         this.currentConditions.splice(+i, 1);
     }
   }
 
-  getCurrentConditions(): any[] {
+  getCurrentConditions(): LocationConditions[] {
     return this.currentConditions;
   }
 
